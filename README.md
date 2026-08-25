@@ -1,59 +1,67 @@
 # Patient RAG Microservice
 
-سيرفس مستقل (standalone) للجزء الخاص بالمريض في البروجيكت الطبي.
-المريض بيرفع مستنداته (روشيتات / تحاليل / أشعة) والسيرفس بيرد على أسئلته بناءً على مستنداته هو فقط.
+A standalone microservice responsible for the patient-side Retrieval-Augmented Generation (RAG) functionality of the medical project.
 
-## التشغيل
+Patients can upload their medical documents, such as prescriptions, laboratory reports, and medical images. The service processes these documents and allows patients to ask questions based on their uploaded medical information.
 
-```bash
-# لازم Ollama شغال قبل ما تشغلي السيرفس
-ollama pull nomic-embed-text
-ollama pull llama3.1
-ollama serve
+The service uses **Google Gemini** for both:
+- Text embeddings
+- AI response generation
 
-# في terminal تاني
-cd rag-service
-npm install
-cp .env.example .env   # عدّلي DB_URL و JWT_SECRET لو محتاجة
-npm run dev
-```
+MongoDB is used to store documents, extracted text, chunks, embeddings, and chat history.
 
-## الفكرة العامة (Pipeline)
+---
 
-**رفع ملف:**
-`Upload → extractText (pdf-parse / mammoth / tesseract OCR) → chunker → Ollama embeddings (nomic-embed-text) → حفظ في Chunk collection`
+## Features
 
-**سؤال المريض:**
-`Question → embedding → cosine similarity على chunks المريض فقط → بناء context → Ollama chat (llama3.1) → رد`
+- Upload medical documents
+- Extract text from supported files
+- Split extracted text into chunks
+- Generate embeddings using Gemini
+- Store document chunks and embeddings in MongoDB
+- Retrieve the most relevant chunks using cosine similarity
+- Generate answers using Gemini
+- Support Arabic and English questions
+- Patient data isolation using JWT authentication
+- Store patient chat history
+- Return the source documents used to generate an answer
+- Delete uploaded documents and their associated chunks
 
-كل الاتصال بـ Ollama بيحصل محلياً على `http://localhost:11434` — مفيش API keys ولا فلوس.
+---
 
-## الـ Endpoints
+## Technology Stack
 
-كل الـ endpoints محتاجة `Authorization: Bearer <JWT>` بنفس الـ secret المستخدم في الباك اند الرئيسي.
+- Node.js
+- Express.js
+- MongoDB
+- Mongoose
+- Google Gemini API
+- JWT Authentication
+- Multer
+- PDF/Text extraction
+- OCR for supported images
+- Cosine Similarity
+- Nodemon
 
-| Method | Endpoint              | الوظيفة                          |
-|--------|------------------------|-----------------------------------|
-| POST   | `/api/documents/upload`| رفع ملف (form-data: `file`, `category`) |
-| GET    | `/api/documents`       | عرض مستندات المريض                |
-| DELETE | `/api/documents/:id`   | حذف مستند ومحتواه                 |
-| POST   | `/api/chat/ask`        | سؤال (`{ "question": "..." }`)    |
-| GET    | `/health`              | فحص حالة السيرفس                  |
+---
 
-## عزل بيانات المرضى
+## Environment Setup
 
-كل query على `Chunk` و `Document` بيتفلتر بـ `patientId` المستخرج من التوكين
-(`req.patientId` في middleware `auth.js`) - مفيش أي endpoint بياخد `patientId` من الـ body أو الـ params.
+Create a `.env` file based on `.env.example`.
 
-## التكامل مع البروجيكت الرئيسي
+Example:
 
-- شغّاله على port منفصل (افتراضي 5050)
-- الفرونت بيكلمه مباشرة، أو ممكن تعمل proxy/route من الباك اند الرئيسي
-- نفس `JWT_SECRET` لازم يتشارك بين السيرفيسين عشان التوكين يفضل صالح
-- ممكن يستخدم نفس MongoDB cluster بس بقاعدة بيانات أو collections منفصلة
+```env
+PORT=5050
 
-## ملاحظة للـ scale لاحقاً
+MONGODB_URI=your_mongodb_connection_string
 
-الـ similarity search دلوقتي بيتحسب يدوياً في الكود (cosine similarity على كل chunks المريض).
-كافي جداً لعدد صفحات محدود (مشروع تخرج). لو الداتا كبرت كتير، انقل الـ vector search
-لـ MongoDB Atlas Vector Search بدل الحساب اليدوي.
+JWT_SECRET=your_shared_jwt_secret
+
+GEMINI_API_KEY=your_gemini_api_key
+
+EMBEDDING_MODEL=gemini-embedding-001
+
+CHAT_MODEL=gemini-2.5-flash
+
+TOP_K_RESULTS=5
